@@ -213,7 +213,11 @@ def predict(model, X):
 
 if __name__ == "__main__":
     # Create the model
-    model = Classifier(dropout_prob=0.4).to(device)
+    model = Classifier(
+        hidden_size1=256,
+        hidden_size2=128,
+        dropout_prob=0.3
+        ).to(device)
     print(model)
     
 
@@ -222,7 +226,7 @@ if __name__ == "__main__":
         train_loader, 
         val_loader,
         n_epochs=150,
-        lr=0.001,
+        lr=0.0005,
         wd=1e-5,
         patience_lr=7,
         patience_early_stop=15
