@@ -94,7 +94,7 @@ train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-def train_model(model, train_loader, val_loader, n_epochs=150):
+def train_model(model, train_loader, val_loader, n_epochs=150, lr=0.001, wd=1e-5, patience_lr=10, patience_early_stop=20):
     """
     Train the model on the provided data.
     
@@ -111,10 +111,15 @@ def train_model(model, train_loader, val_loader, n_epochs=150):
     
     #Initalized the loss function and optimizer
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=patience_lr)
 
     # Store losses for plotting
     train_losses, val_losses = [], []
+
+    best_val = float('inf')
+    epochs_no_improve = 0
+    best_model_state = None
     
     # Training loop
     for epoch in range(n_epochs):
@@ -154,9 +159,34 @@ def train_model(model, train_loader, val_loader, n_epochs=150):
         train_losses.append(avg_train)
         val_losses.append(avg_val)
 
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"Epoch {epoch+1}/{n_epochs}, Train Loss={avg_train:.4f}, Val Loss={avg_val:.4f}, LR={current_lr:.6f}")
+        scheduler.step(avg_val)
+
+        if avg_val < best_val:
+            best_val = avg_val
+            epochs_no_improve = 0
+            best_model_state = model.state_dict().copy()
+            print(f"Epoch {epoch+1}: New best validation loss: {best_val:.4f}. Model state saved.")
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve >= patience_early_stop:
+            print(f"Early stopping triggered after {epoch+1} epochs. No improvement in val loss for {patience_early_stop} epochs.")
+            if best_model_state:
+                model.load_state_dict(best_model_state)
+                print("Loaded best model state due to early stopping.")
+            break
+            
+    if best_model_state and (epochs_no_improve < patience_early_stop): # If loop finished before early stopping but a best model was found
+        model.load_state_dict(best_model_state)
+        print("Loaded best model state from training (loop finished).")
+    elif not best_model_state and n_epochs > 0:
+        print("Warning: Validation loss did not improve. Model from last epoch is used.")
+
         # Store and print the loss every 10 epochs
-        if epoch % 10 == 0:
-            print(f"Epoch {epoch}, Train Loss={avg_train:.4f}, Val Loss={avg_val:.4f}")
+        # if epoch % 10 == 0:
+        #     print(f"Epoch {epoch}, Train Loss={avg_train:.4f}, Val Loss={avg_val:.4f}")
     
     return train_losses, val_losses
 
@@ -183,11 +213,20 @@ def predict(model, X):
 
 if __name__ == "__main__":
     # Create the model
-    model = Classifier().to(device)
+    model = Classifier(dropout_prob=0.4).to(device)
     print(model)
     
 
-    train_losses, val_losses = train_model(model, train_loader, val_loader)
+    train_losses, val_losses = train_model(
+        model, 
+        train_loader, 
+        val_loader,
+        n_epochs=150,
+        lr=0.001,
+        wd=1e-5,
+        patience_lr=7,
+        patience_early_stop=15
+        )
 
     # Evaluate on full dataset
     all_preds = []
