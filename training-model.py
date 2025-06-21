@@ -2,64 +2,52 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
+from torch.utils.data import Dataset, DataLoader
 
 # Set random seed for reproducibility
 np.random.seed(42)
 torch.manual_seed(42)
 
-def generate_simple_data(n_samples=100, noise=0.2):
-    """
-    Generate a simple synthetic dataset with linear relationship and noise.
+#Use the gpu to train model instead of cpu
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+print(f"Using device: {device}")
+
+#Build the dataset
+class LandmarkDataset(Dataset):
+    def __init__(self, pkl_file, emotion_to_idx):
+        with open(pkl_file, 'rb') as file:
+            self.data = pickle.load(file)
+        self.emotion_to_idx = emotion_to_idx
+
+    def __len__(self):
+        return len(self.data)
     
-    Args:
-        n_samples: Number of data points
-        noise: Amount of noise to add
+    def __getitem__(self, idx):
+        sample = self.data[idx]
         
-    Returns:
-        X: Input features of shape (n_samples, 2)
-        y: Labels of shape (n_samples, 1)
-    """
-    # Create two input features
-    X = np.random.randn(n_samples, 2)
-    
-    # Generate target: if x1 + x2 > 0, then 1, else 0 (with some noise)
-    y_clean = (X[:, 0] + X[:, 1] > 0).astype(np.float32)
-    y = y_clean + np.random.randn(n_samples) * noise
-    y = (y > 0.5).astype(np.float32)
-    
-    # Convert to PyTorch tensors
-    X_tensor = torch.tensor(X, dtype=torch.float32)
-    y_tensor = torch.tensor(y, dtype=torch.float32).view(-1, 1)
-    
-    return X_tensor, y_tensor
+        
+        landmarks = [coord for point in sample['landmarks'] for coord in point]
+        landmarks = torch.tensor(landmarks, dtype=torch.float32)
 
-# Generate our synthetic dataset
-X, y = generate_simple_data(n_samples=200)
-print(f"Generated data: X shape: {X.shape}, y shape: {y.shape}")
+        label = torch.tensor(self.emotion_to_idx[sample['emotion']], dtype=torch.long)
 
-# Visualize the dataset
-plt.figure(figsize=(8, 6))
-plt.scatter(X[:, 0].numpy(), X[:, 1].numpy(), c=y.numpy(), cmap='coolwarm')
-plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
-plt.title("Simple Classification Dataset")
-plt.xlabel("Feature 1")
-plt.ylabel("Feature 2")
-plt.grid(alpha=0.3)
-plt.savefig('simple_data.png')
-plt.close()
+        return landmarks, label
 
-class SimpleClassifier(nn.Module):
-    def __init__(self, input_size=2, hidden_size=8, output_size=1):
+#Specifying the neural network
+class Classifier(nn.Module):
+    def __init__(self, input_size=1434, hidden_size=128, output_size=7):
         """
-        A simple neural network for binary classification.
-        
         Args:
-            input_size: Number of input features (2 in our case)
+            input_size: Number of input features, 468 landmarks * 3 coords = 1404
             hidden_size: Number of neurons in the hidden layer
-            output_size: Number of output classes (1 for binary classification)
+            output_size: Number of output classes, 7 for 7 different emotions
         """
-        super(SimpleClassifier, self).__init__()
+        super(Classifier, self).__init__()
         
         # Define the layers
         self.layer1 = nn.Linear(input_size, hidden_size)
@@ -76,11 +64,24 @@ class SimpleClassifier(nn.Module):
         return x
 
 # Create the model
-model = SimpleClassifier()
+model = Classifier().to(device)
 print(model)
 
-# TODO: Implement the training function
-def train_model(model, X, y, n_epochs=100):
+#Load the dataset
+emotion_to_idx = {
+    "angry": 0,
+    "disgust": 1,
+    "fear": 2,
+    "happy": 3,
+    "neutral": 4,
+    "sad": 5,
+    "surprise": 6
+}
+
+dataset = LandmarkDataset("facial_landmarks_data.pkl", emotion_to_idx)
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+def train_model(model, dataloader, n_epochs=100):
     """
     Train the model on the provided data.
     
@@ -95,7 +96,7 @@ def train_model(model, X, y, n_epochs=100):
     """
     
     #Initalized the loss function and optimizer
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     # Store losses for plotting
@@ -103,20 +104,24 @@ def train_model(model, X, y, n_epochs=100):
     
     # Training loop
     for epoch in range(n_epochs):
-        #Zero the gradients
-        optimizer.zero_grad()
+        for X_batch, y_batch in dataloader:
+            X_batch = X_batch.to(device)
+            y_batch = y_batch.to(device)
 
-        # Forward pass
-        outputs = model(X)
+            #Zero the gradients
+            optimizer.zero_grad()
 
-        # Compute loss
-        loss = loss_fn(outputs, y)
+            # Forward pass
+            outputs = model(X_batch)
 
-        # Backward pass and optimization
-        loss.backward()
+            # Compute loss
+            loss = loss_fn(outputs, y_batch)
 
-        #Update the weights
-        optimizer.step()
+            # Backward pass and optimization
+            loss.backward()
+
+            #Update the weights
+            optimizer.step()
         
         # Store and print the loss every 10 epochs
         if epoch % 10 == 0:
@@ -135,60 +140,38 @@ def predict(model, X):
         X: Input features
         
     Returns:
-        predictions: Binary predictions (0 or 1)
+        predictions
     """
     model.eval()
     with torch.no_grad():
+        X = X.to(device)
         # Get predicted probabilities
         outputs = model(X)
-        # Convert to binary predictions
-        predictions = (torch.sigmoid(outputs) > 0.5).float()
-    return predictions
-
-# Visualize decision boundary
-def plot_decision_boundary(model, X, y):
-    """
-    Plot the decision boundary of the model.
-    
-    Args:
-        model: Trained model
-        X: Input features
-        y: True labels
-    """
-    # Define the grid
-    h = 0.01
-    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
-    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                         np.arange(y_min, y_max, h))
-    
-    # Predict on the grid
-    grid = torch.tensor(np.c_[xx.ravel(), yy.ravel()], dtype=torch.float32)
-    with torch.no_grad():
-        outputs = model(grid)
-        predictions = (torch.sigmoid(outputs) > 0.5).float()
-    
-    # Reshape for plotting
-    predictions = predictions.view(xx.shape).numpy()
-    
-    # Plot
-    plt.figure(figsize=(8, 6))
-    plt.contourf(xx, yy, predictions, cmap='coolwarm', alpha=0.3)
-    plt.scatter(X[:, 0].numpy(), X[:, 1].numpy(), c=y.numpy(), cmap='coolwarm', edgecolor='k', s=50)
-    plt.title('Decision Boundary')
-    plt.xlabel('Feature 1')
-    plt.ylabel('Feature 2')
-    plt.grid(alpha=0.3)
-    plt.savefig('decision_boundary.png')
-    plt.close()
+        # Convert to class predictions using argmax
+        predictions = torch.argmax(outputs, dim=1)
+    return predictions.cpu()
 
 if __name__ == "__main__":
-    # Train the model
-    losses = train_model(model, X, y)
-    #Convert the losses to as a different array for plotting
-    fi_los = [fl.item() for fl in losses]
-    
-    # Plot the loss curve
+    losses = train_model(model, dataloader)
+
+    # Evaluate on full dataset
+    all_preds = []
+    all_labels = []
+
+    for X_batch, y_batch in dataloader:
+        preds = predict(model, X_batch)
+        all_preds.append(preds.cpu())
+        all_labels.append(y_batch.cpu())
+
+    # Concatenate
+    all_preds = torch.cat(all_preds)
+    all_labels = torch.cat(all_labels)
+
+    accuracy = (all_preds == all_labels).float().mean().item()
+    print(f"Training accuracy: {accuracy:.4f}")
+
+    # Loss plot
+    fi_los = [fl for fl in losses]
     plt.figure(figsize=(8, 5))
     plt.plot(range(0, len(fi_los) * 10, 10), fi_los, marker='o')
     plt.xlabel('Epoch')
@@ -198,12 +181,7 @@ if __name__ == "__main__":
     plt.savefig('training_loss.png')
     plt.close()
     
-    # Evaluate the model
-    predictions = predict(model, X)
-    accuracy = (predictions == y).float().mean().item()
-    print(f"Training accuracy: {accuracy:.4f}")
-    
-    # Plot decision boundary
-    plot_decision_boundary(model, X, y)
-    
     print("Training completed! Check the generated images to see the results.")
+
+    #save the model
+    torch.save(model.state_dict(), "emotion_model.pt")
