@@ -39,7 +39,7 @@ class LandmarkDataset(Dataset):
 
 #Specifying the neural network
 class Classifier(nn.Module):
-    def __init__(self, input_size=1434, hidden_size=128, output_size=7):
+    def __init__(self, input_size=1434, hidden_size1=128, hidden_size2=64, output_size=7):
         """
         Args:
             input_size: Number of input features, 468 landmarks * 3 coords = 1404
@@ -49,17 +49,21 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
         
         # Define the layers
-        self.layer1 = nn.Linear(input_size, hidden_size)
-        self.activation = nn.ReLU()
-        self.layer2 = nn.Linear(hidden_size, output_size)
+        self.layer1 = nn.Linear(input_size, hidden_size1)
+        self.activation1 = nn.ReLU()
+        self.layer2 = nn.Linear(hidden_size1, hidden_size2)
+        self.activation2 = nn.ReLU()
+        self.layer3 = nn.Linear(hidden_size2, output_size)
         
     def forward(self, x):
         """
         Forward pass through the network.
         """
         x = self.layer1(x)
-        x = self.activation(x)
+        x = self.activation1(x)
         x = self.layer2(x)
+        x = self.activation2(x)
+        x = self.layer3(x)
         return x
 
 #Load the dataset
@@ -82,15 +86,15 @@ train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-def train_model(model, train_loader, val_loader, n_epochs=100):
+def train_model(model, train_loader, val_loader, n_epochs=150):
     """
     Train the model on the provided data.
     
     Args:
         model: The neural network model
-        Train Loader
-        Val Loader
-        n_epochs: Number of training epochs
+        train_loader
+        val_loader
+        n_epochs: Number of training epochs, 150
         
     Returns:
         Train Losses
