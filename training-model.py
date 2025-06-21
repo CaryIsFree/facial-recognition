@@ -39,7 +39,7 @@ class LandmarkDataset(Dataset):
 
 #Specifying the neural network
 class Classifier(nn.Module):
-    def __init__(self, input_size=1434, hidden_size1=128, hidden_size2=64, output_size=7):
+    def __init__(self, input_size=1434, hidden_size1=128, hidden_size2=64, output_size=7, dropout_prob=0.4):
         """
         Args:
             input_size: Number of input features, 468 landmarks * 3 coords = 1404
@@ -50,9 +50,13 @@ class Classifier(nn.Module):
         
         # Define the layers
         self.layer1 = nn.Linear(input_size, hidden_size1)
+        self.batch_norm1 = nn.BatchNorm1d(hidden_size1)
         self.activation1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(dropout_prob)
         self.layer2 = nn.Linear(hidden_size1, hidden_size2)
+        self.batch_norm2 = nn.BatchNorm1d(hidden_size2)
         self.activation2 = nn.ReLU()
+        self.dropout2 = nn.Dropout(dropout_prob)
         self.layer3 = nn.Linear(hidden_size2, output_size)
         
     def forward(self, x):
@@ -60,9 +64,13 @@ class Classifier(nn.Module):
         Forward pass through the network.
         """
         x = self.layer1(x)
+        x = self.batch_norm1(x)
         x = self.activation1(x)
+        x = self.dropout1(x)
         x = self.layer2(x)
+        x = self.batch_norm2(x)
         x = self.activation2(x)
+        x = self.dropout2(x)
         x = self.layer3(x)
         return x
 
