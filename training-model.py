@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 # Set random seed for reproducibility
 np.random.seed(42)
@@ -29,7 +29,6 @@ class LandmarkDataset(Dataset):
     
     def __getitem__(self, idx):
         sample = self.data[idx]
-        
         
         landmarks = [coord for point in sample['landmarks'] for coord in point]
         landmarks = torch.tensor(landmarks, dtype=torch.float32)
@@ -63,10 +62,6 @@ class Classifier(nn.Module):
         x = self.layer2(x)
         return x
 
-# Create the model
-model = Classifier().to(device)
-print(model)
-
 #Load the dataset
 emotion_to_idx = {
     "angry": 0,
@@ -77,34 +72,44 @@ emotion_to_idx = {
     "sad": 5,
     "surprise": 6
 }
-
 dataset = LandmarkDataset("facial_landmarks_data.pkl", emotion_to_idx)
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+#80% train dataset, 20% validation dataset
+train_size = int(0.8 * len(dataset)) 
+val_size = len(dataset) - train_size
 
-def train_model(model, dataloader, n_epochs=100):
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+def train_model(model, train_loader, val_loader, n_epochs=100):
     """
     Train the model on the provided data.
     
     Args:
         model: The neural network model
-        X: Input features
-        y: Target labels
+        Train Loader
+        Val Loader
         n_epochs: Number of training epochs
         
     Returns:
-        losses: List of loss values during training
+        Train Losses
+        Val Losses
     """
     
     #Initalized the loss function and optimizer
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     # Store losses for plotting
-    losses = []
+    train_losses, val_losses = [], []
     
     # Training loop
     for epoch in range(n_epochs):
-        for X_batch, y_batch in dataloader:
+        model.train()
+        total_train_loss = 0
+
+        for X_batch, y_batch in train_loader:
             X_batch = X_batch.to(device)
             y_batch = y_batch.to(device)
 
@@ -122,13 +127,26 @@ def train_model(model, dataloader, n_epochs=100):
 
             #Update the weights
             optimizer.step()
+            total_train_loss += loss.item()
         
+        model.eval()
+        total_val_loss = 0
+        with torch.no_grad():
+            for X_val, y_val in val_loader:
+                X_val, y_val = X_val.to(device), y_val.to(device)
+                val_outputs = model(X_val)
+                total_val_loss += loss_fn(val_outputs, y_val).item()
+        
+        avg_train = total_train_loss / len(train_loader)
+        avg_val = total_val_loss / len(val_loader)
+        train_losses.append(avg_train)
+        val_losses.append(avg_val)
+
         # Store and print the loss every 10 epochs
         if epoch % 10 == 0:
-            print(f"Epoch {epoch}, Loss: {loss}")  # Update this with actual loss
-            losses.append(loss)  # Update this with actual loss
+            print(f"Epoch {epoch}, Train Loss={avg_train:.4f}, Val Loss={avg_val:.4f}")
     
-    return losses
+    return train_losses, val_losses
 
 # Function to make predictions
 def predict(model, X):
@@ -152,13 +170,18 @@ def predict(model, X):
     return predictions.cpu()
 
 if __name__ == "__main__":
-    losses = train_model(model, dataloader)
+    # Create the model
+    model = Classifier().to(device)
+    print(model)
+    
+
+    train_losses, val_losses = train_model(model, train_loader, val_loader)
 
     # Evaluate on full dataset
     all_preds = []
     all_labels = []
 
-    for X_batch, y_batch in dataloader:
+    for X_batch, y_batch in val_loader:
         preds = predict(model, X_batch)
         all_preds.append(preds.cpu())
         all_labels.append(y_batch.cpu())
@@ -168,17 +191,18 @@ if __name__ == "__main__":
     all_labels = torch.cat(all_labels)
 
     accuracy = (all_preds == all_labels).float().mean().item()
-    print(f"Training accuracy: {accuracy:.4f}")
+    print(f"Validation accuracy: {accuracy:.4f}")
 
-    # Loss plot
-    fi_los = [fl for fl in losses]
+    # Loss plots
     plt.figure(figsize=(8, 5))
-    plt.plot(range(0, len(fi_los) * 10, 10), fi_los, marker='o')
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(val_losses, label='Val Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Loss')
+    plt.title('Training Loss & Validation Loss')
+    plt.legend()
     plt.grid(alpha=0.3)
-    plt.savefig('training_loss.png')
+    plt.savefig('losses.png')
     plt.close()
     
     print("Training completed! Check the generated images to see the results.")
