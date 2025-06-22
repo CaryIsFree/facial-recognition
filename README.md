@@ -11,3 +11,15 @@ This project uses:
 The dataset that was used in training the model is "Face expression recognition dataset" by Johnathan Oheix on Kaggle
 https://www.kaggle.com/datasets/jonathanoheix/face-expression-recognition-dataset
 
+## Prerequisites
+Storage: **at least 3gb**
+
+## Installation Guide
+ 1. Go to the GoFile link below:
+ https://gofile.io/d/OSlWsP
+ 2. Download the file named "EmotionDetector"
+ 3. Run the program.
+ 4. Enjoy!
+
+## Closing
+To exit out of the program, hover over the frame and press **q**.
