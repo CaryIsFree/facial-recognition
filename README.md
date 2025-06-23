@@ -12,7 +12,7 @@ The dataset that was used in training the model is "Face expression recognition 
 https://www.kaggle.com/datasets/jonathanoheix/face-expression-recognition-dataset
 
 ## Prerequisites
- - Storage: **>3.6gb**
+ - Storage: **>920MB**
  - Operating System: Windows 10/11
 
 ## Installation Guide
