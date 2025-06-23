@@ -1,6 +1,6 @@
-# Realtime Face Emotion Detector
+# Realtime Facial Expression Detector
 
-This Realtime Face Emotion Detector repo detects the face displayed on the camera and displays
+This Realtime Facial Expression Detector repo detects the face displayed on the camera and displays
 a text on the frame showing what the model believes what emotion the face is making.
 
 This project uses:
