@@ -15,11 +15,11 @@ https://www.kaggle.com/datasets/jonathanoheix/face-expression-recognition-datase
 Storage: **at least 3gb**
 
 ## Installation Guide
- 1. Go to the GoFile link below:
- https://gofile.io/d/OSlWsP
+ 1. Go to the GoFile link: https://gofile.io/d/eU2LCK
  2. Download the file named "EmotionDetector"
  3. Run the program.
  4. Enjoy!
 
-## Closing
-To exit out of the program, hover over the frame and press **q**.
+## Closing Comments
+ - To exit out of the program, hover over the frame and press **q**.
+ - WARNING: DO NOT MODIFY THE CONTENTS OF THE FOLDER!!!
