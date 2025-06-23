@@ -49,7 +49,7 @@ else:
 print(f"Using device: {device}")
 
 #Instantiate model and load weights
-model_path = "./src/emotion_model.pt"
+model_path = "emotion_model.pt"
 
 emotion_model = Classifier(
     input_size=1434, #478 * 3 = 1434 landmarks
