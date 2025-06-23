@@ -5,9 +5,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-
 class Classifier(nn.Module):
-    def __init__(self, input_size=1434, hidden_size1=128, hidden_size2=64, output_size=7, dropout_prob=0.4):
+    def __init__(self, input_size=1434, hidden_size1=256, hidden_size2=128, output_size=7, dropout_prob=0.4):
         """
         Args:
             input_size: Number of input features, 468 landmarks * 3 coords = 1404
@@ -50,12 +49,11 @@ else:
 print(f"Using device: {device}")
 
 #Instantiate model and load weights
-model_path = "emotion_model.pt"
+model_path = "./src/emotion_model.pt"
 
 emotion_model = Classifier(
     input_size=1434, #478 * 3 = 1434 landmarks
     hidden_size1=256,
-    hidden_size2=128,
     output_size=7,
     dropout_prob=0.3
     ).to(device)
