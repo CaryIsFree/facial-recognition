@@ -12,8 +12,8 @@ The dataset that was used in training the model is "Face expression recognition 
 https://www.kaggle.com/datasets/jonathanoheix/face-expression-recognition-dataset
 
 ## Prerequisites
-Storage: **at least 3.6gb**
-Operating System: **Linux**
+ - Storage: **>3.6gb**
+ - Operating System: **Linux**
 
 ## Installation Guide
  1. Go to the GoFile link: https://gofile.io/d/eU2LCK
