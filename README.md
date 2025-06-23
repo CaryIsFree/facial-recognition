@@ -13,7 +13,7 @@ https://www.kaggle.com/datasets/jonathanoheix/face-expression-recognition-datase
 
 ## Prerequisites
  - Storage: **>3.6gb**
- - Operating System: **Linux**
+ - Operating System: Windows 10/11
 
 ## Installation Guide
  1. Go to the GoFile link: https://gofile.io/d/eU2LCK
